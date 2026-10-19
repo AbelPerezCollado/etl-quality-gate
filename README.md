@@ -59,10 +59,11 @@ flowchart LR
 ## 6. Estructura del repositorio
 
 ```text
-etl-quality-gate/
+sentinel/
+├── .gitignore
+├── LICENSE
 ├── README.md
 ├── pyproject.toml
-├── LICENSE
 ├── src/etl_quality_gate/
 │   ├── __init__.py
 │   ├── control.py
@@ -70,7 +71,8 @@ etl-quality-gate/
 │   ├── exceptions.py
 │   ├── models.py
 │   ├── config.py
-│   └── audit.py
+│   ├── audit.py
+│   └── py.typed
 └── tests/
     ├── test_control.py
     ├── test_config.py
@@ -106,11 +108,13 @@ python -c "from etl_quality_gate import ETLControl, __version__; print(__version
 
 ## 9. Construcción del paquete wheel
 
+Con el entorno de desarrollo instalado (§8):
+
 ```bash
-python -m pip install build
 python -m build
-ls dist/etl_quality_gate-0.3.0-py3-none-any.whl
 ```
+
+Esto genera `dist/etl_quality_gate-0.3.0-py3-none-any.whl` (y un `.tar.gz` de código fuente). `dist/` es un directorio generado: puede borrarse y se reconstruye con este comando.
 
 ## 10. Distribución en S3
 
@@ -234,6 +238,14 @@ Si la configuración incluye `csv_path`, el registro se persiste a un CSV ademá
 - La cabecera se escribe una sola vez; los directorios padre se crean automáticamente.
 - Varios jobs que escriban en el mismo fichero se serializan con bloqueo `flock` (best-effort, solo POSIX).
 - Un fallo de escritura del CSV **no** afecta a la ETL: se registra en el logger y el job continúa.
+
+Ejemplo de contenido:
+
+```text
+execution_id,process_name,start_time,end_time,duration_seconds,status,rows_count,error_code,error_message
+949e375c...,ETL_CLIENTES,2026-10-19T10:00:00+00:00,2026-10-19T10:00:12+00:00,12.4,SUCCESS,85432,,
+820a9d3f...,ETL_CLIENTES,2026-10-19T11:00:00+00:00,2026-10-19T11:00:03+00:00,3.1,FAILED,42,RuntimeError,fallo JDBC
+```
 
 `CSVAuditSink` también se puede usar directamente: `ETLControl(config, audit_sink=CSVAuditSink("ruta.csv"))`. Una `audit_sink` explícita tiene prioridad sobre `csv_path`.
 
