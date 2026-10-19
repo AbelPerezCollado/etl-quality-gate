@@ -8,7 +8,7 @@ Versión actual: **0.3.0** (MVP).
 
 `etl_quality_gate` se incorpora a cada proceso ETL como una dependencia —no como código copiado—. Ofrece un contexto de ejecución que registra identificadores, tiempos, estados y errores, valida la volumetría contra umbrales configurados, persiste el resultado en CSV y **propaga las excepciones** para que EMR, SageMaker o el orquestador corporativo vean el fallo.
 
-Está pensada para usarse en desarrollo (cluster EMR + notebook SageMaker) y en producción, sin acoplarse a ADA ni a servicios AWS concretos.
+Está pensada para usarse en desarrollo (cluster EMR + notebook SageMaker) y en producción, sin acoplarse a ninguna plataforma de orquestación concreta ni a servicios AWS específicos.
 
 ## 2. Problema que resuelve
 
@@ -35,12 +35,12 @@ Sin una capa común, cada Data Engineer reimplementa recuentos, logs y manejo de
 - Escritura del registro en S3.
 - Repositorio central de auditoría, SNS, Lambda, DynamoDB, CloudWatch como destino.
 - Comparación histórica de volumetría (media de ejecuciones previas).
-- Integración con Engines ADA.
+- Integración con el orquestador corporativo.
 - Instalación automática en la creación del cluster.
 
 ## 4. Arquitectura propuesta
 
-El núcleo solo depende de la librería estándar. PySpark es opcional. AWS y ADA quedan detrás de interfaces (`AuditSink`) o de documentación de distribución.
+El núcleo solo depende de la librería estándar. PySpark es opcional. AWS y el orquestador quedan detrás de interfaces (`AuditSink`) o de documentación de distribución.
 
 ## 5. Diagrama de componentes
 
@@ -59,7 +59,7 @@ flowchart LR
 ## 6. Estructura del repositorio
 
 ```text
-sentinel/
+etl-quality-gate/
 ├── .gitignore
 ├── LICENSE
 ├── README.md
@@ -262,7 +262,7 @@ Todo el comportamiento se configura en un único JSON plano:
 | `max_rows` | entero ≥ 0 | Umbral máximo de filas. Opcional. |
 | `on_violation` | `"FAIL"` \| `"WARN"` | Por defecto `FAIL`. `WARN` no detiene el job. |
 | `csv_path` | string | Ruta del CSV de auditoría. Opcional. |
-| `execution_id` | string | Sobreescribe el UUID (p.ej. id del Engine ADA). |
+| `execution_id` | string | Sobreescribe el UUID (p.ej. el id del orquestador). |
 
 Carga en código:
 
@@ -318,7 +318,7 @@ Compatibilidad: no se eliminarán exports de `__all__` sin un cambio de versión
 2. Comparación histórica de volumetría: leer registros previos del CSV y saltar WARN si la media se desvía.
 3. Recuentos de rechazados / escritos como métricas opcionales.
 4. Extra de calidad de datos (nulos, duplicados) reutilizando `ETLControl`.
-5. Adaptador ADA una vez validadas las capacidades reales de la plataforma.
+5. Adaptador del orquestador corporativo una vez validadas sus capacidades reales.
 6. Publicación en el índice pip corporativo, si existe.
 
 ## 21. Decisiones pendientes de validar con el entorno corporativo
@@ -326,8 +326,8 @@ Compatibilidad: no se eliminarán exports de `__all__` sin un cambio de versión
 - Existencia y uso obligatorio de un repositorio interno de paquetes Python.
 - Modalidad EMR de desarrollo y de producción (EC2, Serverless u otra).
 - Versión de Python embebida en esos clusters (debe ser 3.11+ o hay que relajar el bound).
-- Si ADA permite `--py-files`, bootstrap, o un `pip install` previo al Engine.
+- Si el orquestador permite `--py-files`, bootstrap, o un `pip install` previo al Engine.
 - Dónde debe vivir el registro de auditoría a medio plazo (logs del job vs repositorio central).
 - Convención corporativa para `process_name` y para reutilizar el id de ejecución del Engine.
 
-Hasta que eso se confirme, la librería permanece desacoplada de ADA y de AWS.
+Hasta que eso se confirme, la librería permanece desacoplada del orquestador y de AWS.
