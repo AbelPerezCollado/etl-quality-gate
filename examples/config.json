@@ -1,0 +1,7 @@
+{
+  "process_name": "EXAMPLE_ETL",
+  "min_rows": 80000,
+  "max_rows": 120000,
+  "on_violation": "WARN",
+  "csv_path": "examples/audit.csv"
+}

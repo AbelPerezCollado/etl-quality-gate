@@ -1,24 +1,27 @@
 # ETL Quality Gate
 
-Librería Python reutilizable para estandarizar los **controles técnicos y de volumetría** de las ETL PySpark.
+Volumetry & audit control for PySpark ETLs — data-quality checks on the roadmap.
 
-![Python](https://img.shields.io/badge/python-3.11%2B-blue)
-![Version](https://img.shields.io/badge/version-0.3.0-informational)
-![License](https://img.shields.io/badge/license-MIT-green)
+![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)
+![CI](https://github.com/AbelPerezCollado/etl-quality-gate/actions/workflows/ci.yml/badge.svg)
+![Version](https://img.shields.io/github/v/tag/AbelPerezCollado/etl-quality-gate)
+![License MIT](https://img.shields.io/badge/license-MIT-green)
 
-## 1. Qué es y por qué
+## 1. What is it & why?
 
-`etl_quality_gate` se incorpora a cada proceso ETL como una dependencia —no como código copiado—. Ofrece un contexto de ejecución que registra identificadores, tiempos, estados y errores, valida la volumetría contra umbrales configurados, persiste el resultado en CSV y **propaga las excepciones** para que el cluster o el orquestador vean el fallo. Está pensada para desarrollo (EMR + notebooks) y producción, sin acoplarse a una plataforma concreta.
+`etl_quality_gate` is a reusable Python library to standardise volumetry and audit controls in PySpark ETLs. It captures execution identity, timing, status and errors; validates row counts against configurable min/max thresholds; persists an audit trail to CSV; and **propagates exceptions** so the job fails visibly.
 
-Sin una capa común, cada Data Engineer reimplementa recuentos, logs y manejo de errores de forma distinta. Un proceso puede fallar sin rastro estructurado, o peor: un `try/except` demasiado amplio puede hacer que un job fallido se registre como correcto. Un único fichero JSON estandariza los umbrales de volumetría y el registro de auditoría de todos los procesos del equipo.
+It avoids coupling to any specific orchestration platform or AWS services, and has zero runtime dependencies (only the Python standard library). PySpark is optional.
 
-## 2. Requisitos e instalación
+## 2. Requirements & Installation
 
-| Requisito | Valor |
+| Requirement | Value |
 | --- | --- |
-| Python | 3.11 o superior |
-| Dependencias runtime | Ninguna fuera de la stdlib |
-| PySpark | Opcional (`pip install etl-quality-gate[spark]`) |
+| Python | 3.11 or higher |
+| Runtime deps | None (stdlib only) |
+| PySpark | Optional |
+
+Install from source (editable for development):
 
 ```bash
 python3 -m venv .venv
@@ -26,250 +29,194 @@ source .venv/bin/activate
 python -m pip install -e ".[dev]"
 ```
 
-Comprobación:
+Or install directly from this repository:
+
+```bash
+python -m pip install "git+https://github.com/AbelPerezCollado/etl-quality-gate.git"
+```
+
+Check:
 
 ```bash
 python -c "from etl_quality_gate import ETLControl, __version__; print(__version__)"
 ```
 
-## 3. Uso rápido
+## 3. Quick start
 
-Fichero de configuración (`config_etl.json`):
+Example config (`examples/config.json`):
 
 ```json
 {
-  "process_name": "ETL_CLIENTES",
+  "process_name": "EXAMPLE_ETL",
   "min_rows": 80000,
   "max_rows": 120000,
   "on_violation": "WARN",
-  "csv_path": "logs/etl_audit.csv"
+  "csv_path": "examples/audit.csv"
 }
 ```
 
-En la ETL:
+ETL snippet:
 
 ```python
 from etl_quality_gate import ETLControl
 
-with ETLControl.from_json("config_etl.json") as control:
-    df = spark.read.parquet("s3://entrada/clientes")
-    control.validate(df)  # cuenta filas y compara con min_rows / max_rows
-    df.write.parquet("s3://salida/clientes")
+with ETLControl.from_json("config.json") as control:
+    df = spark.read.parquet("s3://input/table")
+    control.validate(df)        # counts rows and checks min/max
+    df.write.parquet("s3://output/table")
 ```
 
-Al salir del bloque, el registro se escribe en el CSV y en los logs (`SUCCESS` / `SUCCESS_WITH_WARNINGS` / `FAILED`). La librería **no** crea `SparkSession`: debe existir una sesión activa creada por la ETL o el entorno.
+The library **does not create a SparkSession**. If you already know the row count, skip the Spark action:
 
-## 4. Cómo funciona
+```python
+with ETLControl.from_json("config.json") as control:
+    control.validate(row_count=95000)
+```
 
-### Funcionalidades
+## 4. How it works
 
-- Contexto `ETLControl` (inicio, fin, duración, estado).
-- Identificador de ejecución (UUID, sobreescribible).
-- `validate(df)`: valida el volumen contra `min_rows` / `max_rows` del JSON.
-- Políticas `FAIL` / `WARN` en incumplimientos de volumen.
-- Propagación de excepciones y estado `FAILED`.
-- Cierre `ABORTED` por `atexit` (mejor esfuerzo).
-- Configuración por dataclass / dict / JSON, sin Pydantic.
-- Auditoría a logs (`LoggingAuditSink`) y a CSV (`CSVAuditSink`).
-- Paquete instalable (`pyproject.toml`, wheel).
+### Features
 
-### Arquitectura
+- Lifecycle (`start`, `finish`) with `atexit` best-effort `ABORTED` handling.
+- Volumetry: `min_rows` / `max_rows`, policy `FAIL` (raises) or `WARN` (continues with `SUCCESS_WITH_WARNINGS`).
+- Audit sinks: `LoggingAuditSink` (default) and `CSVAuditSink` (append-only CSV).
+- Strict config validation: unknown keys raise `InvalidConfigError`; min > max rejected.
+- Exceptions propagate: `VolumeViolationError` or any ETL exception is recorded and re-raised.
 
-El núcleo solo depende de la librería estándar; PySpark es opcional. AWS y el orquestador quedan detrás de interfaces (`AuditSink`).
+### Architecture
 
 ```mermaid
 flowchart LR
-  ETL[ETL PySpark] --> API[ETLControl]
+  ETL[PySpark ETL] --> API[ETLControl]
   API --> Vol[volumetry]
   API --> Rec[ExecutionRecord]
   API --> Sink[AuditSink]
   Sink --> Logs[LoggingAuditSink]
   Sink --> CSV[CSVAuditSink]
-  Sink -.-> Future[Sinks futuros]
-  ETL -.-> Spark[SparkSession de la ETL]
+  ETL -.-> Spark[Existing SparkSession]
 ```
 
-### Controles de volumetría
+## 5. Audit & CSV
 
-Si el recuento ya se conoce, pase `row_count` y evite una acción Spark:
+Fields: `execution_id, process_name, start_time, end_time, duration_seconds, status, rows_count, error_code, error_message`.
 
-```python
-n = source.count()  # una sola acción Spark
-control.validate(row_count=n)
-```
-
-Sin umbrales en el JSON, `validate` solo registra el recuento sin comparar. Con política `WARN`, un valor fuera de rango no detiene el job:
-
-```python
-with ETLControl.from_json("config_etl.json") as control:
-    control.validate(row_count=10)  # fuera de rango
-# estado final: SUCCESS_WITH_WARNINGS; no se lanza excepción
-```
-
-### Excepciones
-
-Cualquier excepción dentro del `with` se registra (`error_code`, `error_message`, estado `FAILED`) y **se vuelve a lanzar**, de modo que el job no termina como éxito. `VolumeViolationError` (política `FAIL`, por defecto) deja igualmente el estado en `FAILED` y se propaga.
-
-Uso manual equivalente:
-
-```python
-control = ETLControl(ControlConfig(process_name="ETL_CLIENTES"))
-control.start()
-try:
-    ...
-    control.finish()
-except Exception as exc:
-    control.finish(exc)
-    raise
-```
-
-Pase siempre la excepción capturada a `finish(exc)`; si no, el estado final sería `SUCCESS`. Con el context manager no hace falta este `try`: `__exit__` registra y re-lanza.
-
-## 5. Auditoría y logs
-
-Cada ejecución emite al menos dos eventos: `RUNNING` al entrar y el estado final al salir. Campos del registro:
-
-`execution_id`, `process_name`, `start_time`, `end_time`, `duration_seconds`, `status`, `rows_count`, `error_code`, `error_message`.
-
-Los desconocidos van a `null`. El destino por defecto es el logger `etl_quality_gate.audit` (JSON); no se escriben credenciales ni el contenido de los DataFrames.
-
-Para pruebas:
-
-```python
-from etl_quality_gate import ControlConfig, ETLControl, InMemoryAuditSink
-
-sink = InMemoryAuditSink()
-with ETLControl(ControlConfig(process_name="ETL_X"), audit_sink=sink) as control:
-    ...
-print(sink.records[-1].to_dict())
-```
-
-### Persistencia en CSV
-
-Si la configuración incluye `csv_path`, el registro se persiste a un CSV además de ir a los logs (`CompositeAuditSink`):
-
-- Una fila por evento (aprox. dos por ejecución: `RUNNING` y el estado final).
-- La cabecera se escribe una sola vez; los directorios padre se crean automáticamente.
-- Varios jobs que escriban en el mismo fichero se serializan con bloqueo `flock` (best-effort, solo POSIX).
-- Un fallo de escritura del CSV **no** afecta a la ETL: se registra en el logger y el job continúa.
-
-Ejemplo de contenido:
+Sample CSV (committed in `examples/output/audit.csv`):
 
 ```text
 execution_id,process_name,start_time,end_time,duration_seconds,status,rows_count,error_code,error_message
-949e375c...,ETL_CLIENTES,2026-10-19T10:00:00+00:00,2026-10-19T10:00:12+00:00,12.4,SUCCESS,85432,,
-820a9d3f...,ETL_CLIENTES,2026-10-19T11:00:00+00:00,2026-10-19T11:00:03+00:00,3.1,FAILED,42,RuntimeError,fallo JDBC
+sample-9d3f...,EXAMPLE_ETL,2026-10-19T10:00:00+00:00,,,RUNNING,,,
+sample-9d3f...,EXAMPLE_ETL,2026-10-19T10:00:00+00:00,2026-10-19T10:00:00.015000+00:00,0.015,SUCCESS,95000,,
 ```
 
-`CSVAuditSink` también se puede usar directamente: `ETLControl(config, audit_sink=CSVAuditSink("ruta.csv"))`. Una `audit_sink` explícita tiene prioridad sobre `csv_path`.
+- CSV is append-only; directories created automatically.
+- Multiple processes writing the same file are serialized with `flock` (best-effort, POSIX).
+- Sink I/O failures never break the ETL (logged and swallowed by the control).
 
-## 6. Configuración
+## 6. Configuration
 
-Todo el comportamiento se configura en un único JSON plano:
-
-| Clave | Tipo | Efecto |
+| Key | Type | Notes |
 | --- | --- | --- |
-| `process_name` | string | Obligatorio. Identifica el proceso en auditoría. |
-| `min_rows` | entero ≥ 0 | Umbral mínimo de filas. Opcional. |
-| `max_rows` | entero ≥ 0 | Umbral máximo de filas. Opcional. |
-| `on_violation` | `"FAIL"` \| `"WARN"` | Por defecto `FAIL`. `WARN` no detiene el job. |
-| `csv_path` | string | Ruta del CSV de auditoría. Opcional. |
-| `execution_id` | string | Sobreescribe el UUID (p.ej. el id del orquestador). |
+| `process_name` | string | Required |
+| `min_rows` | int ≥ 0 | Optional |
+| `max_rows` | int ≥ 0 | Optional |
+| `on_violation` | `"FAIL" \| "WARN"` | Default `FAIL` |
+| `csv_path` | string | Optional CSV path |
+| `execution_id` | string | Override UUID |
 
-Carga en código:
+Unknown keys → `InvalidConfigError`. `min_rows > max_rows` → `InvalidConfigError`.
 
 ```python
 from etl_quality_gate import ControlConfig, ETLControl
 
-config = ControlConfig.from_json("config_etl.json")                            # desde fichero
-config = ControlConfig.from_dict({"process_name": "ETL_X", "max_rows": 1000})  # desde dict
-control = ETLControl(config)
+cfg = ControlConfig.from_json("config.json")
+cfg = ControlConfig.from_dict({"process_name": "ETL_X", "max_rows": 1000})
+ctl = ETLControl(cfg)
 ```
 
-Comportamiento ante datos inválidos:
+## 7. Examples
 
-| Caso | Resultado |
-| --- | --- |
-| Falta `process_name` o está vacío | `InvalidConfigError` al construir |
-| Umbral no entero (p.ej. `"80000"` o `true`) | `InvalidConfigError` |
-| Umbral negativo | `InvalidConfigError` |
-| `min_rows > max_rows` | `InvalidConfigError` |
-| Clave desconocida | `InvalidConfigError` |
-| Umbral omitido | No se valida ese lado |
-| `csv_path` vacío o no string | `InvalidConfigError` |
+A minimal, no-Spark example is included:
 
-`validate` no admite umbrales por llamada: mandan siempre los del JSON.
-
-## 7. Distribución
-
-El artefacto distribuible es un wheel versionado, publicado por ejemplo en S3:
-
-```text
-s3://<bucket>/<prefijo>/etl-quality-gate/0.3.0/etl_quality_gate-0.3.0-py3-none-any.whl
+```bash
+python examples/example.py
 ```
 
-Incorporación según el entorno:
+It uses a tiny `RowSet` class with `count()` to satisfy the `Countable` protocol. The committed sample CSV is at [`examples/output/audit.csv`](examples/output/audit.csv).
 
-- **PySpark:** `--py-files` apuntando al wheel versionado, o `spark.submit.pyFiles` en Serverless.
-- **EMR sobre EC2 / notebooks:** bootstrap o `pip install` del wheel en el driver; en notebooks, instalar en el kernel.
+## 8. Distribution
 
-Subir el fichero a S3 **no** instala el paquete. Valide el mecanismo con la versión de EMR real: no todas las opciones existen en todos los modos. La ETL no debe copiar el código fuente de esta librería en su job.
+Build a distributable wheel (and sdist):
 
-## 8. Limitaciones y roadmap
+```bash
+python -m build
+```
 
-**Limitaciones conocidas**
+Artifacts land in `dist/`. For EMR/cluster use, point `--py-files` to the versioned wheel, or `pip install` it on the driver. No code should be copied into the ETL job.
 
-- `DataFrame.count()` es una acción Spark; puede ser costosa. Pase `row_count` si ya lo tiene.
-- `validate` mide el DataFrame antes de escribir: no demuestra que la escritura haya terminado bien.
-- Una segunda llamada a `validate` sobreescribe `rows_count`; la intención es una validación por ejecución.
-- `atexit` no se ejecuta ante SIGKILL, OOM del driver o aborto nativo de la JVM.
-- El núcleo no envía métricas a ningún servicio corporativo.
-- Python anterior a 3.11 no está soportado.
+## 9. Limitations & Roadmap
+
+**Limitations**
+
+- `DataFrame.count()` is a distributed action; pass `row_count` if already known.
+- Validation checks the DataFrame before writing — it does not guarantee a successful write.
+- Calling `validate` twice overwrites `rows_count` for that execution.
+- `atexit` cannot cover `SIGKILL`, OOM-kill or abrupt JVM crashes.
+- Python < 3.11 is not supported.
 
 **Roadmap**
 
-1. Sink de auditoría en S3 (extra `[aws]`, con permisos explícitos de la ETL).
-2. Comparación histórica de volumetría: leer registros previos del CSV y avisar si la media se desvía.
-3. Recuentos de rechazados / escritos como métricas opcionales.
-4. Extra de calidad de datos (nulos, duplicados) reutilizando `ETLControl`.
-5. Adaptador del orquestador corporativo una vez validadas sus capacidades reales.
+1. S3 audit sink (`[aws]` extra) with explicit ETL permissions.
+2. Historical volumetry comparison against previous CSV runs.
+3. Optional rejected/written row counts.
+4. Data-quality checks (nulls, duplicates) built on top of `ETLControl`.
+5. Adapter for a specific orchestrator once capabilities are confirmed.
 
-## 9. Desarrollo
+## 10. Development
 
 ```bash
-python -m build          # genera dist/etl_quality_gate-0.3.0-py3-none-any.whl (+ .tar.gz)
-python -m pytest tests -q
+python -m pytest tests -q        # run tests (Spark tests auto-skip if pyspark missing)
+python -m build                 # build wheel + sdist
+python examples/example.py      # run smoke example
 ```
 
-`dist/` es un directorio generado: puede borrarse y se reconstruye con `python -m build`. Las pruebas Spark (`test_spark_control.py`) se omiten automáticamente (`pytest.importorskip`) si PySpark no está instalado; no sustituyen a las unitarias.
-
-Estructura del repositorio:
+Repository layout:
 
 ```text
 etl-quality-gate/
+├── .github/workflows/ci.yml
 ├── .gitignore
 ├── LICENSE
 ├── README.md
+├── examples/
+│   ├── config.json
+│   ├── example.py
+│   └── output/audit.csv
 ├── pyproject.toml
 ├── src/etl_quality_gate/
 │   ├── __init__.py
+│   ├── audit.py
+│   ├── config.py
 │   ├── control.py
-│   ├── volumetry.py
 │   ├── exceptions.py
 │   ├── models.py
-│   ├── config.py
-│   ├── audit.py
-│   └── py.typed
+│   ├── py.typed
+│   └── volumetry.py
 └── tests/
-    ├── test_control.py
     ├── test_config.py
-    ├── test_volumetry.py
+    ├── test_control.py
     ├── test_csv_sink.py
-    └── test_spark_control.py
+    ├── test_spark_control.py
+    └── test_volumetry.py
 ```
 
-Versionado PEP 440: la versión actual es `0.3.0` y se incrementa ante cambios de API. No existe `logging.py` a propósito: sombrearía el módulo estándar de Python.
+PEP 440 versioning: `0.3.0`. CI runs on Python 3.11 and 3.12.
 
-## 10. Licencia
+## 11. Licencia (Resumen en español)
 
-MIT. Consulte [`LICENSE`](LICENSE).
+**Licencia MIT**: puedes usar, copiar, modificar, distribuir y sublicenciar este software, incluyendo uso comercial, siempre que se incluya la nota de copyright y la licencia original.
+
+Ver [`LICENSE`](LICENSE) para el texto completo.
+
+## Summary in Spanish (Resumen en español)
+
+`etl-quality-gate` estandariza **controles de volumetría y auditoría** en ETLs PySpark. Registra ejecución (identificador, tiempos, estado, errores), valida recuentos contra `min_rows`/`max_rows`, guarda auditoría en CSV y propaga excepciones. Sin dependencias runtime; PySpark opcional. Política `FAIL`/`WARN`. Dos sinks (`LoggingAuditSink`, `CSVAuditSink`) con `flock` (best-effort). Configuración JSON estricta (claves desconocidas → error). Cierre `ABORTED` vía `atexit`. Ejemplo sin Spark en `examples/`. Tests: 53 pasan + 1 omitido si falta PySpark. Versión `0.3.0`.

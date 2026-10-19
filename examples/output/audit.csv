@@ -1,0 +1,3 @@
+execution_id,process_name,start_time,end_time,duration_seconds,status,rows_count,error_code,error_message
+sample-9d3f...,EXAMPLE_ETL,2026-10-19T10:00:00+00:00,,,RUNNING,,,
+sample-9d3f...,EXAMPLE_ETL,2026-10-19T10:00:00+00:00,2026-10-19T10:00:00.015000+00:00,0.015,SUCCESS,95000,,

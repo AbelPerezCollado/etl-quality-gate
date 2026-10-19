@@ -35,6 +35,11 @@ where = ["src"]
 [tool.setuptools.package-data]
 etl_quality_gate = ["py.typed"]
 
+[project.urls]
+Homepage = "https://github.com/AbelPerezCollado/etl-quality-gate"
+Repository = "https://github.com/AbelPerezCollado/etl-quality-gate"
+Issues = "https://github.com/AbelPerezCollado/etl-quality-gate/issues"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
