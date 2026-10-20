@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "etl-quality-gate"
-version = "0.3.0"
+version = "0.3.1"
 description = "Librería reutilizable de control técnico y funcional para ETL PySpark."
 readme = "README.md"
 requires-python = ">=3.11"

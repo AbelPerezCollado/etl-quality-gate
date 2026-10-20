@@ -228,7 +228,7 @@ etl-quality-gate/
     └── test_volumetry.py
 ```
 
-PEP 440 versioning: `0.3.0`. CI runs on Python 3.11 and 3.12.
+PEP 440 versioning: `0.3.1`. CI runs on Python 3.11 and 3.12.
 
 ## 11. Licencia (Resumen en español)
 
@@ -238,4 +238,4 @@ Ver [`LICENSE`](LICENSE) para el texto completo.
 
 ## Summary in Spanish (Resumen en español)
 
-`etl-quality-gate` estandariza **controles de volumetría y auditoría** en ETLs PySpark. Registra ejecución (identificador, tiempos, estado, errores), valida recuentos contra `min_rows`/`max_rows`, guarda auditoría en CSV y propaga excepciones. Sin dependencias runtime; PySpark opcional. Política `FAIL`/`WARN`. Dos sinks (`LoggingAuditSink`, `CSVAuditSink`) con `flock` (best-effort). Configuración JSON estricta (claves desconocidas → error). Cierre `ABORTED` vía `atexit`. Ejemplo sin Spark en `examples/`. Tests: 53 pasan + 1 omitido si falta PySpark. Versión `0.3.0`.
+`etl-quality-gate` estandariza **controles de volumetría y auditoría** en ETLs PySpark. Registra ejecución (identificador, tiempos, estado, errores), valida recuentos contra `min_rows`/`max_rows`, guarda auditoría en CSV y propaga excepciones. Sin dependencias runtime; PySpark opcional. Política `FAIL`/`WARN`. Dos sinks (`LoggingAuditSink`, `CSVAuditSink`) con `flock` (best-effort). Configuración JSON estricta (claves desconocidas → error). Cierre `ABORTED` vía `atexit`. Ejemplo sin Spark en `examples/`. Tests: 53 pasan + 1 omitido si falta PySpark. Versión `0.3.1`.

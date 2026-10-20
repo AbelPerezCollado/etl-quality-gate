@@ -17,7 +17,7 @@ from etl_quality_gate.exceptions import (
 )
 from etl_quality_gate.models import ExecutionRecord, ExecutionStatus
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
 __all__ = [
     "AuditSink",
