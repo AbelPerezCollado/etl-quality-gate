@@ -26,11 +26,9 @@ dependencies = []
 spark = ["pyspark>=3.4"]
 dev = ["pytest>=7.4", "build>=1.0"]
 
-[tool.setuptools]
-package-dir = { "" = "src" }
-
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["."]
+include = ["etl_quality_gate*"]
 
 [tool.setuptools.package-data]
 etl_quality_gate = ["py.typed"]
@@ -42,7 +40,7 @@ Issues = "https://github.com/AbelPerezCollado/etl-quality-gate/issues"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+pythonpath = ["."]
 markers = [
     "spark: tests that require a local PySpark installation",
 ]

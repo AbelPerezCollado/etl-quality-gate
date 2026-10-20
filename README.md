@@ -21,18 +21,24 @@ It avoids coupling to any specific orchestration platform or AWS services, and h
 | Runtime deps | None (stdlib only) |
 | PySpark | Optional |
 
-Install from source (editable for development):
+**There is nothing to install.** The library is a plain folder — use it by copying `etl_quality_gate/` into your project (or by running from this repository's root):
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -e ".[dev]"
+```text
+your-etl-project/
+├── etl_quality_gate/     # copied from this repo
+│   ├── __init__.py
+│   ├── audit.py
+│   ├── config.py
+│   ├── control.py
+│   ├── exceptions.py
+│   ├── models.py
+│   ├── py.typed
+│   └── volumetry.py
+└── your_etl.py
 ```
 
-Or install directly from this repository:
-
-```bash
-python -m pip install "git+https://github.com/AbelPerezCollado/etl-quality-gate.git"
+```python
+from etl_quality_gate import ETLControl
 ```
 
 Check:
@@ -40,6 +46,8 @@ Check:
 ```bash
 python -c "from etl_quality_gate import ETLControl, __version__; print(__version__)"
 ```
+
+> Future option: `pyproject.toml` is ready, so when the package is published (or if you ever want a local install) `pip install .` / `pip install "git+https://github.com/AbelPerezCollado/etl-quality-gate.git"` will work without any restructuring. For the MVP, copying the folder is the supported path.
 
 ## 3. Quick start
 
@@ -135,7 +143,7 @@ ctl = ETLControl(cfg)
 
 ## 7. Examples
 
-A minimal, no-Spark example is included:
+A minimal, no-Spark example is included and runs **without any installation**, from any directory:
 
 ```bash
 python examples/example.py
@@ -145,13 +153,21 @@ It uses a tiny `RowSet` class with `count()` to satisfy the `Countable` protocol
 
 ## 8. Distribution
 
-Build a distributable wheel (and sdist):
+**MVP (no pip involved):** ship the folder itself. Zip it and attach it to the Spark submission:
 
 ```bash
-python -m build
+zip -r etl_quality_gate.zip etl_quality_gate
+spark-submit --py-files etl_quality_gate.zip your_etl.py
 ```
 
-Artifacts land in `dist/`. For EMR/cluster use, point `--py-files` to the versioned wheel, or `pip install` it on the driver. No code should be copied into the ETL job.
+The same zip works on EMR via `spark-submit --py-files` or cluster bootstrap. No code should be copied into the ETL job.
+
+**Future (optional):** `pyproject.toml` is in place, so a wheel can be built and installed with pip once needed:
+
+```bash
+python -m pip install build
+python -m build        # artifacts land in dist/
+```
 
 ## 9. Limitations & Roadmap
 
@@ -173,10 +189,13 @@ Artifacts land in `dist/`. For EMR/cluster use, point `--py-files` to the versio
 
 ## 10. Development
 
+The library itself is never installed — the tests and examples import it straight from the repository root. pip is only used to fetch the test runner (and optionally PySpark):
+
 ```bash
-python -m pytest tests -q        # run tests (Spark tests auto-skip if pyspark missing)
-python -m build                 # build wheel + sdist
-python examples/example.py      # run smoke example
+python -m pip install pytest                 # test runner only
+python -m pytest tests -q                    # run tests (Spark tests auto-skip if pyspark missing)
+python -m pip install pyspark                # optional, to run the Spark tests
+python examples/example.py                   # run smoke example
 ```
 
 Repository layout:
@@ -192,7 +211,7 @@ etl-quality-gate/
 │   ├── example.py
 │   └── output/audit.csv
 ├── pyproject.toml
-├── src/etl_quality_gate/
+├── etl_quality_gate/
 │   ├── __init__.py
 │   ├── audit.py
 │   ├── config.py

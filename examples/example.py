@@ -3,7 +3,7 @@
 Any object exposing ``count()`` satisfies the library's ``Countable``
 protocol, so this example runs anywhere -- no PySpark install needed.
 
-Run it from the repository root:
+No installation required; it works from any working directory:
 
     python examples/example.py
 
@@ -14,12 +14,15 @@ and writes the audit record to ``examples/audit.csv``.
 from __future__ import annotations
 
 import logging
+import sys
 from pathlib import Path
 
-from etl_quality_gate import ETLControl
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from etl_quality_gate import ETLControl  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
-OUTPUT = HERE / "audit.csv"
+OUTPUT = HERE / "audit2.csv"
 
 
 class RowSet:
@@ -38,7 +41,7 @@ def main() -> None:
     # Keep the committed sample stable while this example runs locally
     OUTPUT.unlink(missing_ok=True)
 
-    source = RowSet(95_000)  # stands in for rows read from the source
+    source = RowSet(1)  # stands in for rows read from the source
 
     with ETLControl.from_json(HERE / "config.json") as control:
         rows = control.validate(source)  # calls source.count(), applies thresholds

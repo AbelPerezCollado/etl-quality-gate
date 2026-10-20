@@ -1,7 +1,7 @@
 {
-  "process_name": "EXAMPLE_ETL",
+  "process_name": "REPORTE_PROBATINA",
   "min_rows": 80000,
   "max_rows": 120000,
   "on_violation": "WARN",
-  "csv_path": "examples/audit.csv"
+  "csv_path": "examples/probatina.csv"
 }
